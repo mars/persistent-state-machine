@@ -1,0 +1,6 @@
+[package]
+name = "persistent-state-machine"
+version = "0.1.0"
+authors = ["Mars Hall <mars@vurt.com>"]
+
+[dependencies]
