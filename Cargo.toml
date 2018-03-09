@@ -4,4 +4,11 @@ version = "0.1.0"
 authors = ["Mars Hall <mars@vurt.com>"]
 
 [dependencies]
-chrono = "0.4"
+dotenv = "0.11.0"
+chrono = { version = "0.4", features = ["serde"] }
+r2d2 = "0.8.2"
+r2d2-diesel = "1.0.0"
+serde = "1.0.29"
+serde_derive = "1.0.29"
+serde_json = "1.0.10"
+diesel = { version = "1.1.1", default-features = false, features = ["chrono", "postgres", "serde_json"] }
