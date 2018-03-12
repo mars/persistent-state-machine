@@ -1,21 +1,20 @@
-use schema::cryos;
+use schema::lives;
 use chrono;
-use serde_json;
 
 #[derive(Insertable, Debug)]
-#[table_name="cryos"]
-pub struct NewCryo {
+#[table_name="lives"]
+pub struct NewLife {
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: Option<chrono::NaiveDateTime>,
-    pub state_name: String,
-    pub state_data: serde_json::Value,
+    pub born_at: Option<chrono::NaiveDateTime>,
+    pub died_at: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(Queryable, Debug)]
-pub struct Cryo {
+pub struct Life {
     pub id: i32,
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: Option<chrono::NaiveDateTime>,
-    pub state_name: String,
-    pub state_data: serde_json::Value,
+    pub born_at: Option<chrono::NaiveDateTime>,
+    pub died_at: Option<chrono::NaiveDateTime>,
 }
