@@ -1,39 +1,17 @@
 use chrono::prelude::*;
-use models::{Life, NewLife};
 use diesel;
 use diesel::prelude::*;
 use diesel::PgConnection;
 use r2d2;
 use r2d2_diesel::ConnectionManager;
-use schema;
 use std::mem;
 
-const STATE_NAME_GESTATING: &'static str = "Gestating";
-const STATE_NAME_ALIVE: &'static str = "Alive";
-const STATE_NAME_DEAD: &'static str = "Dead";
+use models::Life;
+use schema;
 
-impl Life {
-    fn new(db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> Self {
-        let connection = db_connection_pool.get()
-            .expect("get Postgres connection from pool");
-        let now = Utc::now().naive_utc();
-
-        let new_life = NewLife {
-            state_type: String::from(STATE_NAME_GESTATING),
-            created_at: now,
-            updated_at: Some(now),
-            born_at: None,
-            died_at: None,
-        };
-
-        let database_record = diesel::insert_into(schema::lives::table)
-            .values(&new_life)
-            .get_result::<Life>(&*connection)
-            .expect("Error saving new Life");
-
-        database_record
-    }
-}
+pub const STATE_NAME_GESTATING: &'static str = "Gestating";
+pub const STATE_NAME_ALIVE: &'static str = "Alive";
+pub const STATE_NAME_DEAD: &'static str = "Dead";
 
 // Possible states
 #[derive(Debug)]
@@ -68,25 +46,12 @@ impl Phase {
         }
     }
     fn save(&mut self, db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> () {
-        let connection = db_connection_pool.get()
-            .expect("get Postgres connection from pool");
-        let now = Utc::now().naive_utc();
-        let life = match *self {
+        let mut life = match *self {
             Phase::Gestating(ref v) => v.state.to_owned(),
             Phase::Alive(ref v) => v.state.to_owned(),
             Phase::Dead(ref v) => v.state.to_owned(),
         };
-        let updated_life = Life {
-            updated_at: Some(now),
-            ..life
-        };
-        let life_result = diesel::update(schema::lives::table)
-            .set(&updated_life)
-            .get_result::<Life>(&*connection);
-        let life = match life_result {
-            Ok(v) => v,
-            Err(e) => panic!("Error updating database record (lives.id: {:?}): {:?})", life.id, e),
-        };
+        life.save(db_connection_pool);
         let new_self = match life.state_type.clone().as_ref() {
             STATE_NAME_GESTATING    => Phase::Gestating(Gestating { state: life }),
             STATE_NAME_ALIVE        => Phase::Alive(Alive { state: life }),
