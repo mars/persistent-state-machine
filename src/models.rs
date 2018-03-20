@@ -32,7 +32,7 @@ pub struct Life {
 }
 
 impl Life {
-    pub fn new(db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> Self {
+    pub fn create(db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> Self {
         let connection = db_connection_pool.get()
             .expect("get Postgres connection from pool");
         let now = Utc::now().naive_utc();
@@ -48,7 +48,7 @@ impl Life {
         let database_record = diesel::insert_into(lives::table)
             .values(&new_life)
             .get_result::<Life>(&*connection)
-            .expect("Error saving new Life");
+            .expect("Error creating new Life");
 
         database_record
     }

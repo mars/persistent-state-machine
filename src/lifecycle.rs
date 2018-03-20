@@ -22,8 +22,8 @@ enum Phase {
 }
 
 impl Phase {
-    fn new(db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> Phase {
-        let life = Life::new(db_connection_pool);
+    fn create(db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> Phase {
+        let life = Life::create(db_connection_pool);
         Phase::Gestating(Gestating { state: life })
     }
     fn find_by_life(db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>, id: i32) -> Phase {
@@ -148,7 +148,7 @@ mod tests {
             .expect("Failed to create pool.");
 
         let life_phase = Phase::Gestating(Gestating {
-            state: Life::new(&pool)
+            state: Life::create(&pool)
         });
         match life_phase {
             Phase::Gestating(val) => assert_eq!(val.state.born_at, None),
@@ -165,7 +165,7 @@ mod tests {
         let pool = r2d2::Pool::builder().build(manager)
             .expect("Failed to create pool.");
 
-        let life_phase = Phase::new(&pool);
+        let life_phase = Phase::create(&pool);
         match life_phase {
             Phase::Gestating(val) => assert_eq!(val.state.born_at, None),
             val => assert!(false, format!("Expecting Gestating; instead got {:?}", val)),
@@ -265,7 +265,7 @@ mod tests {
         let pool = r2d2::Pool::builder().build(manager)
             .expect("Failed to create pool.");
 
-        let gestating = if let Phase::Gestating(p) = Phase::new(&pool) { p }
+        let gestating = if let Phase::Gestating(p) = Phase::create(&pool) { p }
             else { panic!("Not Gestating") };
 
         let result = Phase::find_by_life(&pool, gestating.state.id);
@@ -286,7 +286,7 @@ mod tests {
         let pool = r2d2::Pool::builder().build(manager)
             .expect("Failed to create pool.");
 
-        let phase = Phase::new(&pool);
+        let phase = Phase::create(&pool);
         let gestating = if let Phase::Gestating(p) = phase { p }
             else { panic!("Not Gestating") };
 
@@ -318,7 +318,7 @@ mod tests {
         let pool = r2d2::Pool::builder().build(manager)
             .expect("Failed to create pool.");
 
-        let phase = Phase::new(&pool);
+        let phase = Phase::create(&pool);
         let gestating = if let Phase::Gestating(p) = phase { p }
             else { panic!("Not Gestating") };
 
