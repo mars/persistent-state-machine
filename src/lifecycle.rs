@@ -27,18 +27,21 @@ impl Phase {
         let life = Life::find(db_connection_pool, id);
         life.as_phase()
     }
-    pub fn save(&mut self, db_connection_pool: &Pool<ConnectionManager<PgConnection>>) -> () {
-        let mut life = self.as_life();
-        life.save(db_connection_pool);
-        let new_self = life.as_phase();
+    pub fn save(&mut self, db_connection_pool: &Pool<ConnectionManager<PgConnection>>) -> &mut Self {
+        let new_self = self
+            .as_life()
+            .save(db_connection_pool)
+            .as_phase();
         mem::replace(self, new_self);
+        self
     }
     pub fn as_life(&self) -> Life {
-        match *self {
-            Phase::Gestating(ref v) => v.state.to_owned(),
-            Phase::Alive(ref v) => v.state.to_owned(),
-            Phase::Dead(ref v) => v.state.to_owned(),
-        }
+        let life = match self {
+            &Phase::Gestating(ref v) => &v.state,
+            &Phase::Alive(ref v) => &v.state,
+            &Phase::Dead(ref v) => &v.state,
+        };
+        life.to_owned()
     }
 }
 

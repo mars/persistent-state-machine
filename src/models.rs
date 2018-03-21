@@ -63,7 +63,7 @@ impl Life {
             Err(e) => panic!("Error finding database record (lives.id: {:?}): {:?})", id, e),
         }
     }
-    pub fn save(&mut self, db_connection_pool: &Pool<ConnectionManager<PgConnection>>) -> () {
+    pub fn save(&mut self, db_connection_pool: &Pool<ConnectionManager<PgConnection>>) -> &mut Self {
         let connection = db_connection_pool.get()
             .expect("get Postgres connection from pool");
         let now = Utc::now().naive_utc();
@@ -79,16 +79,18 @@ impl Life {
             Err(e) => panic!("Error updating database record (lives.id: {:?}): {:?})", self.id, e),
         };
         mem::replace(self, new_self);
+        self
     }
     pub fn as_phase(&self) -> Phase {
         let life = self.to_owned();
-        match life.state_type.clone().as_ref() {
+        let phase = match self.state_type.as_ref() {
             STATE_NAME_GESTATING    => Phase::Gestating(Gestating { state: life }),
             STATE_NAME_ALIVE        => Phase::Alive(Alive { state: life }),
             STATE_NAME_DEAD         => Phase::Dead(Dead { state: life }),
             invalid_name            => panic!(
                 "Invalid state name (state_type: {:?}) found in database record (id: {:?})",
                 invalid_name, self.id),
-        }
+        };
+        phase
     }
 }
