@@ -21,21 +21,24 @@ pub enum Phase {
 impl Phase {
     pub fn create(db_connection_pool: &Pool<ConnectionManager<PgConnection>>) -> Phase {
         let life = Life::create(db_connection_pool);
-        Phase::Gestating(Gestating { state: life })
+        life.as_phase()
     }
     pub fn find_by_life(db_connection_pool: &Pool<ConnectionManager<PgConnection>>, id: i32) -> Phase {
         let life = Life::find(db_connection_pool, id);
         life.as_phase()
     }
     pub fn save(&mut self, db_connection_pool: &Pool<ConnectionManager<PgConnection>>) -> () {
-        let mut life = match *self {
-            Phase::Gestating(ref v) => v.state.to_owned(),
-            Phase::Alive(ref v) => v.state.to_owned(),
-            Phase::Dead(ref v) => v.state.to_owned(),
-        };
+        let mut life = self.as_life();
         life.save(db_connection_pool);
         let new_self = life.as_phase();
         mem::replace(self, new_self);
+    }
+    pub fn as_life(&self) -> Life {
+        match *self {
+            Phase::Gestating(ref v) => v.state.to_owned(),
+            Phase::Alive(ref v) => v.state.to_owned(),
+            Phase::Dead(ref v) => v.state.to_owned(),
+        }
     }
 }
 
