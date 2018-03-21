@@ -3,7 +3,7 @@ use chrono::prelude::*;
 use diesel;
 use diesel::prelude::*;
 use diesel::PgConnection;
-use r2d2;
+use r2d2::Pool;
 use r2d2_diesel::ConnectionManager;
 use std::mem;
 
@@ -32,7 +32,7 @@ pub struct Life {
 }
 
 impl Life {
-    pub fn create(db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> Self {
+    pub fn create(db_connection_pool: &Pool<ConnectionManager<PgConnection>>) -> Self {
         let connection = db_connection_pool.get()
             .expect("get Postgres connection from pool");
         let now = Utc::now().naive_utc();
@@ -52,7 +52,18 @@ impl Life {
 
         database_record
     }
-    pub fn save(&mut self, db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> () {
+    pub fn find(db_connection_pool: &Pool<ConnectionManager<PgConnection>>, id: i32) -> Self {
+        let connection = db_connection_pool.get()
+            .expect("get Postgres connection from pool");
+        let life_result = lives::table
+            .filter(lives::columns::id.eq(id))
+            .get_result::<Life>(&*connection);
+        match life_result {
+            Ok(v) => v,
+            Err(e) => panic!("Error finding database record (lives.id: {:?}): {:?})", id, e),
+        }
+    }
+    pub fn save(&mut self, db_connection_pool: &Pool<ConnectionManager<PgConnection>>) -> () {
         let connection = db_connection_pool.get()
             .expect("get Postgres connection from pool");
         let now = Utc::now().naive_utc();

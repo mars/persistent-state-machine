@@ -1,13 +1,10 @@
 use chrono::prelude::*;
-use diesel;
-use diesel::prelude::*;
 use diesel::PgConnection;
-use r2d2;
+use r2d2::Pool;
 use r2d2_diesel::ConnectionManager;
 use std::mem;
 
 use models::Life;
-use schema;
 
 pub const STATE_NAME_GESTATING: &'static str = "Gestating";
 pub const STATE_NAME_ALIVE: &'static str = "Alive";
@@ -22,23 +19,15 @@ pub enum Phase {
 }
 
 impl Phase {
-    pub fn create(db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> Phase {
+    pub fn create(db_connection_pool: &Pool<ConnectionManager<PgConnection>>) -> Phase {
         let life = Life::create(db_connection_pool);
         Phase::Gestating(Gestating { state: life })
     }
-    pub fn find_by_life(db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>, id: i32) -> Phase {
-        let connection = db_connection_pool.get()
-            .expect("get Postgres connection from pool");
-        let life_result = schema::lives::table
-            .filter(schema::lives::columns::id.eq(id))
-            .get_result::<Life>(&*connection);
-        let life = match life_result {
-            Ok(v) => v,
-            Err(e) => panic!("Error finding database record (lives.id: {:?}): {:?})", id, e),
-        };
+    pub fn find_by_life(db_connection_pool: &Pool<ConnectionManager<PgConnection>>, id: i32) -> Phase {
+        let life = Life::find(db_connection_pool, id);
         life.as_phase()
     }
-    pub fn save(&mut self, db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> () {
+    pub fn save(&mut self, db_connection_pool: &Pool<ConnectionManager<PgConnection>>) -> () {
         let mut life = match *self {
             Phase::Gestating(ref v) => v.state.to_owned(),
             Phase::Alive(ref v) => v.state.to_owned(),
