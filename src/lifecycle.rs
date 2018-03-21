@@ -15,18 +15,18 @@ pub const STATE_NAME_DEAD: &'static str = "Dead";
 
 // Possible states
 #[derive(Debug)]
-enum Phase {
+pub enum Phase {
     Gestating(Gestating),
     Alive(Alive),
     Dead(Dead),
 }
 
 impl Phase {
-    fn create(db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> Phase {
+    pub fn create(db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> Phase {
         let life = Life::create(db_connection_pool);
         Phase::Gestating(Gestating { state: life })
     }
-    fn find_by_life(db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>, id: i32) -> Phase {
+    pub fn find_by_life(db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>, id: i32) -> Phase {
         let connection = db_connection_pool.get()
             .expect("get Postgres connection from pool");
         let life_result = schema::lives::table
@@ -36,50 +36,36 @@ impl Phase {
             Ok(v) => v,
             Err(e) => panic!("Error finding database record (lives.id: {:?}): {:?})", id, e),
         };
-        match life.state_type.clone().as_ref() {
-            STATE_NAME_GESTATING    => Phase::Gestating(Gestating { state: life }),
-            STATE_NAME_ALIVE        => Phase::Alive(Alive { state: life }),
-            STATE_NAME_DEAD         => Phase::Dead(Dead { state: life }),
-            invalid_name            => panic!(
-                "Invalid state name (state_type: {:?}) found in database record (lives.id: {:?})",
-                invalid_name, id),
-        }
+        life.as_phase()
     }
-    fn save(&mut self, db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> () {
+    pub fn save(&mut self, db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> () {
         let mut life = match *self {
             Phase::Gestating(ref v) => v.state.to_owned(),
             Phase::Alive(ref v) => v.state.to_owned(),
             Phase::Dead(ref v) => v.state.to_owned(),
         };
         life.save(db_connection_pool);
-        let new_self = match life.state_type.clone().as_ref() {
-            STATE_NAME_GESTATING    => Phase::Gestating(Gestating { state: life }),
-            STATE_NAME_ALIVE        => Phase::Alive(Alive { state: life }),
-            STATE_NAME_DEAD         => Phase::Dead(Dead { state: life }),
-            invalid_name            => panic!(
-                "Invalid state name (state_type: {:?}) after updating database record (lives.id: {:?})",
-                invalid_name, life.id),
-        };
+        let new_self = life.as_phase();
         mem::replace(self, new_self);
     }
 }
 
 // Life state
 #[derive(Debug)]
-struct Gestating {
-    state: Life
+pub struct Gestating {
+    pub state: Life
 }
 
 // Life state
 #[derive(Debug)]
-struct Alive {
-    state: Life
+pub struct Alive {
+    pub state: Life
 }
 
 // Life state
 #[derive(Debug)]
-struct Dead {
-    state: Life
+pub struct Dead {
+    pub state: Life
 }
 
 enum Event {

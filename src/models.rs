@@ -7,7 +7,7 @@ use r2d2;
 use r2d2_diesel::ConnectionManager;
 use std::mem;
 
-use lifecycle::STATE_NAME_GESTATING;
+use lifecycle::{STATE_NAME_GESTATING, STATE_NAME_ALIVE, STATE_NAME_DEAD, Phase, Gestating, Alive, Dead};
 use schema::lives;
 
 #[derive(Insertable, Debug)]
@@ -53,20 +53,31 @@ impl Life {
         database_record
     }
     pub fn save(&mut self, db_connection_pool: &r2d2::Pool<ConnectionManager<PgConnection>>) -> () {
-      let connection = db_connection_pool.get()
-          .expect("get Postgres connection from pool");
-      let now = Utc::now().naive_utc();
-      let updated_life = Life {
-          updated_at: Some(now),
-          ..self.to_owned()
-      };
-      let life_result = diesel::update(lives::table)
-          .set(&updated_life)
-          .get_result::<Life>(&*connection);
-      let new_self = match life_result {
-          Ok(v) => v,
-          Err(e) => panic!("Error updating database record (lives.id: {:?}): {:?})", self.id, e),
-      };
-      mem::replace(self, new_self);
+        let connection = db_connection_pool.get()
+            .expect("get Postgres connection from pool");
+        let now = Utc::now().naive_utc();
+        let updated_life = Life {
+            updated_at: Some(now),
+            ..self.to_owned()
+        };
+        let life_result = diesel::update(lives::table)
+            .set(&updated_life)
+            .get_result::<Life>(&*connection);
+        let new_self = match life_result {
+            Ok(v) => v,
+            Err(e) => panic!("Error updating database record (lives.id: {:?}): {:?})", self.id, e),
+        };
+        mem::replace(self, new_self);
+    }
+    pub fn as_phase(&self) -> Phase {
+        let life = self.to_owned();
+        match life.state_type.clone().as_ref() {
+            STATE_NAME_GESTATING    => Phase::Gestating(Gestating { state: life }),
+            STATE_NAME_ALIVE        => Phase::Alive(Alive { state: life }),
+            STATE_NAME_DEAD         => Phase::Dead(Dead { state: life }),
+            invalid_name            => panic!(
+                "Invalid state name (state_type: {:?}) found in database record (id: {:?})",
+                invalid_name, self.id),
+        }
     }
 }
