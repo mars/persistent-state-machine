@@ -32,9 +32,7 @@ pub struct Life {
 }
 
 impl Life {
-    pub fn create(db_connection_pool: &Pool<ConnectionManager<PgConnection>>) -> Self {
-        let connection = db_connection_pool.get()
-            .expect("get Postgres connection from pool");
+    pub fn create(db_connection: &PgConnection) -> Self {
         let now = Utc::now().naive_utc();
 
         let new_life = NewLife {
@@ -47,25 +45,21 @@ impl Life {
 
         let database_record = diesel::insert_into(lives::table)
             .values(&new_life)
-            .get_result::<Life>(&*connection)
+            .get_result::<Life>(&*db_connection)
             .expect("Error creating new Life");
 
         database_record
     }
-    pub fn find(db_connection_pool: &Pool<ConnectionManager<PgConnection>>, id: i32) -> Self {
-        let connection = db_connection_pool.get()
-            .expect("get Postgres connection from pool");
+    pub fn find(db_connection: &PgConnection, id: i32) -> Self {
         let life_result = lives::table
             .filter(lives::columns::id.eq(id))
-            .get_result::<Life>(&*connection);
+            .get_result::<Life>(&*db_connection);
         match life_result {
             Ok(v) => v,
             Err(e) => panic!("Error finding database record (lives.id: {:?}): {:?})", id, e),
         }
     }
-    pub fn save(&mut self, db_connection_pool: &Pool<ConnectionManager<PgConnection>>) -> &mut Self {
-        let connection = db_connection_pool.get()
-            .expect("get Postgres connection from pool");
+    pub fn save(&mut self, db_connection: &PgConnection) -> &mut Self {
         let now = Utc::now().naive_utc();
         let updated_life = Life {
             updated_at: Some(now),
@@ -73,7 +67,7 @@ impl Life {
         };
         let life_result = diesel::update(lives::table)
             .set(&updated_life)
-            .get_result::<Life>(&*connection);
+            .get_result::<Life>(&*db_connection);
         let new_self = match life_result {
             Ok(v) => v,
             Err(e) => panic!("Error updating database record (lives.id: {:?}): {:?})", self.id, e),
