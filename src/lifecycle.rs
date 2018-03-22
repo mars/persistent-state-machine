@@ -111,7 +111,7 @@ impl From<Gestating> for Dead {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diesel::PgConnection;
+    use diesel::{Connection, PgConnection};
     use dotenv::dotenv;
     use r2d2;
     use r2d2_diesel::ConnectionManager;
@@ -127,6 +127,8 @@ mod tests {
             .expect("Failed to create pool.");
         let connection = pool.get()
             .expect("get Postgres connection from pool");
+        connection.begin_test_transaction()
+            .expect("failed to begin test transaction");
 
         let life_phase = Phase::Gestating(Gestating {
             state: Life::create(&connection)
@@ -147,6 +149,8 @@ mod tests {
             .expect("Failed to create pool.");
         let connection = pool.get()
             .expect("get Postgres connection from pool");
+        connection.begin_test_transaction()
+            .expect("failed to begin test transaction");
 
         let life_phase = Phase::create(&connection);
         match life_phase {
@@ -240,7 +244,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_phase_by_life() {
+    fn finds_phase_gestating_by_life() {
         dotenv().ok();
         let postgres_url = env::var("DATABASE_URL")
             .expect("requires DATABASE_URL env var");
@@ -249,6 +253,8 @@ mod tests {
             .expect("Failed to create pool.");
         let connection = pool.get()
             .expect("get Postgres connection from pool");
+        connection.begin_test_transaction()
+            .expect("failed to begin test transaction");
 
         let gestating = if let Phase::Gestating(p) = Phase::create(&connection) { p }
             else { panic!("Not Gestating") };
@@ -261,7 +267,81 @@ mod tests {
     }
 
     #[test]
-    fn finds_alive_phase_by_life() {
+    fn finds_phase_alive_by_life() {
+        dotenv().ok();
+        let now = Utc::now().naive_utc();
+        let postgres_url = env::var("DATABASE_URL")
+            .expect("requires DATABASE_URL env var");
+        let manager = ConnectionManager::<PgConnection>::new(postgres_url);
+        let pool = r2d2::Pool::builder().build(manager)
+            .expect("Failed to create pool.");
+        let connection = pool.get()
+            .expect("get Postgres connection from pool");
+        connection.begin_test_transaction()
+            .expect("failed to begin test transaction");
+
+        let gestating = if let Phase::Gestating(p) = Phase::create(&connection) { p }
+            else { panic!("Not Gestating") };
+        let mut alive = Phase::Alive(gestating.into());
+        alive.save(&connection);
+        let alive = if let Phase::Alive(p) = alive { p }
+            else { panic!("Not Alive") };
+
+        let result = Phase::find_by_life(&connection, alive.state.id);
+        match result {
+            Phase::Alive(val) => {
+                match val.state.born_at {
+                    Some(at) => {
+                        let dur = now.signed_duration_since(at);
+                        assert!(dur.num_seconds() <= 1, "Expecting current born_at when Alive")
+                    }
+                    None => assert!(false, "Expecting born_at timestamp; instead got None")
+                };
+                assert_eq!(val.state.died_at, None);
+            },
+            val => assert!(false, format!("Expecting Alive; instead got {:?}", val)),
+        }
+    }
+
+    #[test]
+    fn finds_phase_dead_by_life() {
+        dotenv().ok();
+        let now = Utc::now().naive_utc();
+        let postgres_url = env::var("DATABASE_URL")
+            .expect("requires DATABASE_URL env var");
+        let manager = ConnectionManager::<PgConnection>::new(postgres_url);
+        let pool = r2d2::Pool::builder().build(manager)
+            .expect("Failed to create pool.");
+        let connection = pool.get()
+            .expect("get Postgres connection from pool");
+        connection.begin_test_transaction()
+            .expect("failed to begin test transaction");
+
+        let gestating = if let Phase::Gestating(p) = Phase::create(&connection) { p }
+            else { panic!("Not Gestating") };
+        let mut dead = Phase::Dead(gestating.into());
+        dead.save(&connection);
+        let dead = if let Phase::Dead(p) = dead { p }
+            else { panic!("Not Dead") };
+
+        let result = Phase::find_by_life(&connection, dead.state.id);
+        match result {
+            Phase::Dead(val) => {
+                assert_eq!(val.state.born_at, None, "Expecting no born_at when Dead");
+                match val.state.died_at {
+                    Some(at) => {
+                        let dur = now.signed_duration_since(at);
+                        assert!(dur.num_seconds() <= 1, "Expecting current died_at when Dead")
+                    }
+                    None => assert!(false, "Expecting died_at timestamp; instead got None")
+                };
+            },
+            val => assert!(false, format!("Expecting Dead; instead got {:?}", val)),
+        }
+    }
+
+    #[test]
+    fn saves_gestating() {
         dotenv().ok();
         let now = Utc::now().naive_utc();
 
@@ -272,6 +352,41 @@ mod tests {
             .expect("Failed to create pool.");
         let connection = pool.get()
             .expect("get Postgres connection from pool");
+        connection.begin_test_transaction()
+            .expect("failed to begin test transaction");
+
+        let mut phase = Phase::create(&connection);
+        phase.save(&connection);
+
+        match phase {
+            Phase::Gestating(val) => {
+                assert_eq!(val.state.born_at, None, "Expecting no born_at when Gestating");
+                match val.state.updated_at {
+                    Some(at) => {
+                        let dur = now.signed_duration_since(at);
+                        assert!(dur.num_seconds() <= 1, "Expecting current updated_at after Gestating is saved")
+                    }
+                    None => assert!(false, "Expecting updated_at timestamp; instead got None")
+                }
+            },
+            val => assert!(false, format!("Expecting Alive; instead got {:?}", val)),
+        }
+    }
+
+    #[test]
+    fn saves_alive() {
+        dotenv().ok();
+        let now = Utc::now().naive_utc();
+
+        let postgres_url = env::var("DATABASE_URL")
+            .expect("requires DATABASE_URL env var");
+        let manager = ConnectionManager::<PgConnection>::new(postgres_url);
+        let pool = r2d2::Pool::builder().build(manager)
+            .expect("Failed to create pool.");
+        let connection = pool.get()
+            .expect("get Postgres connection from pool");
+        connection.begin_test_transaction()
+            .expect("failed to begin test transaction");
 
         let phase = Phase::create(&connection);
         let gestating = if let Phase::Gestating(p) = phase { p }
@@ -295,7 +410,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_dead_phase_by_life() {
+    fn saves_dead() {
         dotenv().ok();
         let now = Utc::now().naive_utc();
 
@@ -306,6 +421,8 @@ mod tests {
             .expect("Failed to create pool.");
         let connection = pool.get()
             .expect("get Postgres connection from pool");
+        connection.begin_test_transaction()
+            .expect("failed to begin test transaction");
 
         let phase = Phase::create(&connection);
         let gestating = if let Phase::Gestating(p) = phase { p }
@@ -315,15 +432,7 @@ mod tests {
         dead.save(&connection);
 
         match dead {
-            Phase::Dead(val) => {
-                match val.state.born_at {
-                    Some(at) => {
-                        let dur = now.signed_duration_since(at);
-                        assert!(dur.num_seconds() <= 1, "Expecting current born_at when Dead")
-                    }
-                    None => assert!(false, "Expecting born_at timestamp; instead got None")
-                }
-            },
+            Phase::Dead(val) => assert_eq!(val.state.born_at, None, "Expecting no born_at when Dead"),
             val => assert!(false, format!("Expecting Dead; instead got {:?}", val)),
         }
     }
